@@ -11,6 +11,7 @@ input int TakeProfit;
 input int StopLoss;
 
 input double DefaultVolume;
+input bool UseTrailingStop;
 input bool UseDefaultVolume;
 input bool IsDebug = false;
 
@@ -32,6 +33,14 @@ double contractSize;
 double minVolume;
 double maxVolume;
 double stepVolume;
+
+ulong trailingTicket;
+bool isTrailingPosition;
+bool isTrailingStopStarted;
+bool isTrailingSell;
+double trailingStartingPrice;
+int trailingStopMaxPoint;
+
 
 int OnInit()
 {
@@ -93,12 +102,15 @@ void OnTimer()
       request.price = bid;
       request.deviation = 30;
       
+      if(UseTrailingStop && !isTrailingPosition)
+         request.comment = "Trailing Stop";
+      
       if(StopLoss >= 1)
          request.sl = NormalizeDouble(bid + (points * StopLoss), digits);
       else
          request.sl = 0;
-         
-      if(TakeProfit >= 1)
+      
+      if(TakeProfit >= 1 && (!UseTrailingStop || isTrailingPosition))
          request.tp = NormalizeDouble(bid - (points * TakeProfit), digits);
       else
          request.tp = 0;
@@ -109,6 +121,11 @@ void OnTimer()
       //Send Request And Check For Error
       if(!OrderSend(request, result))
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
+      else if(UseTrailingStop && !isTrailingPosition)
+      {
+         isTrailingPosition = true;
+         trailingTicket = result.deal;
+      }
          
       if(IsDebug)
          Print(ToString(request) + ToString(result));
@@ -131,12 +148,15 @@ void OnTimer()
       request.price = ask;
       request.deviation = 30;
       
+      if(UseTrailingStop && !isTrailingPosition)
+         request.comment = "Trailing Stop";
+      
       if(StopLoss >= 1)
          request.sl = NormalizeDouble(ask - (points * StopLoss), digits);
       else
          request.sl = 0;
          
-      if(TakeProfit >= 1)
+      if(TakeProfit >= 1 && (!UseTrailingStop || isTrailingPosition))
          request.tp = NormalizeDouble(ask + (points * TakeProfit), digits);
       else
          request.tp = 0;
@@ -147,6 +167,11 @@ void OnTimer()
       //Send Request And Check For Error
       if(!OrderSend(request, result))
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
+      else if(UseTrailingStop && !isTrailingPosition)
+      {
+         isTrailingPosition = true;
+         trailingTicket = result.deal;
+      }
       
       if(IsDebug)
          Print(ToString(request) + ToString(result));
@@ -201,6 +226,42 @@ void OnTimer()
             if(PositionGetString(POSITION_SYMBOL) == currentSymbol)
             {
                trade.PositionClose(ticket);
+            }
+         }
+      }
+   }
+   
+   //The Custom Trailing Stop
+   if(UseTrailingStop && isTrailingPosition)
+   {
+      if(isTrailingStopStarted)
+      {
+         int currentDeltaPoints = isTrailingSell ? ((bid - trailingStartingPrice) / points) * -1 : (ask - trailingStartingPrice) / points;
+         trailingStopMaxPoint = MathMax(trailingStopMaxPoint, currentDeltaPoints);
+         
+         if(trailingStopMaxPoint - currentDeltaPoints >= TakeProfit)
+         {
+            //Close The Position
+            trade.PositionClose(trailingTicket);
+         }
+      }
+      else
+      {
+         //Check If The Price Have Cross The TakeProfit Line To Start Trailing Stop
+         if(isTrailingSell)
+         {
+            if(bid <= trailingStartingPrice - (points * TakeProfit))
+            {
+               isTrailingStopStarted = true;   
+               trailingStopMaxPoint =  ((bid - trailingStartingPrice) / points) * -1;
+            }
+         }
+         else
+         {
+            if(ask >= trailingStartingPrice + (points * TakeProfit))
+            {
+               isTrailingStopStarted = true;
+               trailingStopMaxPoint = (ask - trailingStartingPrice) / points;
             }
          }
       }
