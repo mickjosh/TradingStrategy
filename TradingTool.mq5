@@ -1,4 +1,5 @@
 #include <ChartObjects\ChartObjectsTxtControls.mqh>
+#include <Trade\Trade.mqh>
 
 #define TOSTRING(A)  #A + " = " + (string)(A) + "\n"
 #define TOSTRING2(A) #A + " = " + EnumToString(A) + " (" + (string)(A) + ")\n"
@@ -9,10 +10,17 @@ input double LossPercentage;
 input int TakeProfit;
 input int StopLoss;
 
+input double DefaultVolume;
 input bool IsDebug = false;
+
+CTrade trade;
 
 CChartObjectButton _sellButton;
 CChartObjectButton _buyButton;
+
+CChartObjectButton _closeSellButton;
+CChartObjectButton _closeBuyButton;
+CChartObjectButton _closeAllButton;
 
 string currentSymbol;
 
@@ -61,7 +69,7 @@ void OnTimer()
    //Calculate Volume Of Order
    double maxLoss = (AccountInfoDouble(ACCOUNT_BALANCE) * (LossPercentage / 100));
    
-   double Volume = maxLoss / (StopLoss * contractSize * points * usdCad.ask);
+   double Volume = StopLoss == 0 ? DefaultVolume : (maxLoss / (StopLoss * contractSize * points * usdCad.ask));
    Volume = Clamp(minVolume, maxVolume, Volume);
    Volume = MathFloor(Volume / stepVolume) / stepVolume;
    
@@ -142,6 +150,60 @@ void OnTimer()
       if(IsDebug)
          Print(ToString(request) + ToString(result));
    }
+   else if(_closeSellButton.State())
+   {
+      _closeSellButton.State(false);
+      
+      //Close All Sell Position
+      int total = PositionsTotal();
+      for(int pos=total-1;pos>=0;pos--)
+      {
+         ulong ticket = PositionGetTicket(pos);
+         if(PositionSelectByTicket(ticket))
+         {
+            if(PositionGetString(POSITION_SYMBOL) == currentSymbol && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL)
+            {
+               trade.PositionClose(ticket);
+            }
+         }
+      }
+   }
+   else if(_closeBuyButton.State())
+   {
+      _closeBuyButton.State(false);
+      
+      //Close All Buy Position
+      int total = PositionsTotal();
+      for(int pos=total-1;pos>=0;pos--)
+      {
+         ulong ticket = PositionGetTicket(pos);
+         if(PositionSelectByTicket(ticket))
+         {
+            if(PositionGetString(POSITION_SYMBOL) == currentSymbol && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
+            {
+               trade.PositionClose(ticket);
+            }
+         }
+      }
+   }
+   else if(_closeAllButton.State())
+   {
+      _closeAllButton.State(false);
+      
+      //Close All Position
+      int total = PositionsTotal();
+      for(int pos=total-1;pos>=0;pos--)
+      {
+         ulong ticket = PositionGetTicket(pos);
+         if(PositionSelectByTicket(ticket))
+         {
+            if(PositionGetString(POSITION_SYMBOL) == currentSymbol)
+            {
+               trade.PositionClose(ticket);
+            }
+         }
+      }
+   }
 }
 
 void CreatePanel()
@@ -161,6 +223,30 @@ void CreatePanel()
    _buyButton.Color(clrBlack);
    _buyButton.BackColor(clrLimeGreen);
    _buyButton.BorderColor(clrBlack);
+   
+   //Generate Close Sell
+   _closeSellButton.Create(0, "CloseSellButton", 0, 225, 65, 80, 28);
+   _closeSellButton.Description("Close Sell");
+   _closeSellButton.FontSize(10);
+   _closeSellButton.Color(clrBlack);
+   _closeSellButton.BackColor(clrGray);
+   _closeSellButton.BorderColor(clrBlack);
+   
+   //Generate Close Buy
+   _closeBuyButton.Create(0, "CloseBuyButton", 0, 395, 65, 80, 28);
+   _closeBuyButton.Description("Close Buy");
+   _closeBuyButton.FontSize(10);
+   _closeBuyButton.Color(clrBlack);
+   _closeBuyButton.BackColor(clrGray);
+   _closeBuyButton.BorderColor(clrBlack);
+   
+   //Generate Close All
+   _closeAllButton.Create(0, "CloseAllButton", 0, 310, 65, 80, 28);
+   _closeAllButton.Description("Close All");
+   _closeAllButton.FontSize(10);
+   _closeAllButton.Color(clrBlack);
+   _closeAllButton.BackColor(clrBlue);
+   _closeAllButton.BorderColor(clrBlack);
 }
 
 void DeletePanel()
@@ -168,6 +254,10 @@ void DeletePanel()
    //Deleting All Object
    _sellButton.Delete();
    _buyButton.Delete();
+   
+   _closeSellButton.Delete();
+   _closeBuyButton.Delete();
+   _closeAllButton.Delete();
 }
 
 double Clamp(double Min, double Max, double Value)
