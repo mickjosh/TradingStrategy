@@ -9,6 +9,8 @@ input double LossPercentage;
 input int TakeProfit;
 input int StopLoss;
 
+input bool IsDebug = false;
+
 CChartObjectButton _sellButton;
 CChartObjectButton _buyButton;
 
@@ -29,6 +31,7 @@ int OnInit()
    
    currentSymbol = Symbol();
    
+   //Getting Fix Symbol Info
    points = SymbolInfoDouble(currentSymbol, SYMBOL_POINT);
    digits = SymbolInfoInteger(currentSymbol, SYMBOL_DIGITS);
    contractSize = SymbolInfoDouble(currentSymbol, SYMBOL_TRADE_CONTRACT_SIZE);
@@ -47,20 +50,22 @@ void OnDeinit(const int reason)
 
 void OnTimer()
 {
-   MqlTick Latest_Price;
+   //Getting USDCAD Info
    MqlTick usdCad;
-   SymbolInfoTick(currentSymbol ,Latest_Price);  
    SymbolInfoTick("USDCAD", usdCad);
    
+   //Getting Symbol Price
    double ask = SymbolInfoDouble(currentSymbol, SYMBOL_ASK);
    double bid = SymbolInfoDouble(currentSymbol, SYMBOL_BID);
 
+   //Calculate Volume Of Order
    double maxLoss = (AccountInfoDouble(ACCOUNT_BALANCE) * (LossPercentage / 100));
    
    double Volume = maxLoss / (StopLoss * contractSize * points * usdCad.ask);
    Volume = Clamp(minVolume, maxVolume, Volume);
    Volume = MathFloor(Volume / stepVolume) / stepVolume;
    
+   //Generating Sell Order
    if(_sellButton.State())
    {
       _sellButton.State(false);
@@ -71,6 +76,7 @@ void OnTimer()
       ZeroMemory(request);
       ZeroMemory(result);
       
+      //Create Sell Request
       request.action = TRADE_ACTION_DEAL;
       request.symbol = currentSymbol;
       request.volume = NormalizeDouble(Volume, 2);
@@ -91,10 +97,12 @@ void OnTimer()
       request.type_filling = ORDER_FILLING_IOC;
       request.magic = EXPERT_MAGIC;
       
+      //Send Reqeust And Check For Error
       if(!OrderSend(request, result))
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
          
-      //Print(ToString(request) + ToString(result));
+      if(IsDebug)
+         Print(ToString(request) + ToString(result));
    }
    else if(_buyButton.State())
    {
@@ -106,6 +114,7 @@ void OnTimer()
       ZeroMemory(request);
       ZeroMemory(result);
       
+      //Create Buy Request
       request.action = TRADE_ACTION_DEAL;
       request.symbol = currentSymbol;
       request.volume = NormalizeDouble(Volume, 2);
@@ -126,15 +135,18 @@ void OnTimer()
       request.type_filling = ORDER_FILLING_IOC;
       request.magic = EXPERT_MAGIC;
       
+      //Send Reqeust And Check For Error
       if(!OrderSend(request, result))
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
-         
-      //Print(ToString(request) + ToString(result));
+      
+      if(IsDebug)
+         Print(ToString(request) + ToString(result));
    }
 }
 
 void CreatePanel()
 {
+   //Generating Sell Button
    _sellButton.Create(0 , "SellButton", 0, 245, 25, 100, 36);
    _sellButton.Description("Sell");
    _sellButton.FontSize(20);
@@ -142,6 +154,7 @@ void CreatePanel()
    _sellButton.BackColor(clrRed);
    _sellButton.BorderColor(clrBlack);
    
+   //Generating Buy Button
    _buyButton.Create(0 , "BuyButton", 0, 354, 25, 100, 36);
    _buyButton.Description("Buy");
    _buyButton.FontSize(20);
@@ -152,6 +165,7 @@ void CreatePanel()
 
 void DeletePanel()
 {
+   //Deleting All Object
    _sellButton.Delete();
    _buyButton.Delete();
 }
