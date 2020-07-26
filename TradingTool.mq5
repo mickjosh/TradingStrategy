@@ -193,6 +193,9 @@ void OnTimer()
             }
          }
       }
+      
+      if(isTrailingSell)
+         isTrailingPosition = false;
    }
    else if(_closeBuyButton.State())
    {
@@ -211,9 +214,12 @@ void OnTimer()
             }
          }
       }
+      
+      if(!isTrailingSell)
+         isTrailingPosition = false;
    }
    else if(_closeAllButton.State())
-   {
+   { 
       _closeAllButton.State(false);
       
       //Close All Position
@@ -229,6 +235,8 @@ void OnTimer()
             }
          }
       }
+      
+      isTrailingPosition = false;
    }
    
    //The Custom Trailing Stop
@@ -243,6 +251,7 @@ void OnTimer()
          {
             //Close The Position
             trade.PositionClose(trailingTicket);
+            isTrailingPosition = false;
          }
       }
       else
