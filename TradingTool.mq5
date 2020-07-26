@@ -11,6 +11,7 @@ input int TakeProfit;
 input int StopLoss;
 
 input double DefaultVolume;
+input bool UseDefaultVolume;
 input bool IsDebug = false;
 
 CTrade trade;
@@ -69,7 +70,7 @@ void OnTimer()
    //Calculate Volume Of Order
    double maxLoss = (AccountInfoDouble(ACCOUNT_BALANCE) * (LossPercentage / 100));
    
-   double Volume = StopLoss == 0 ? DefaultVolume : (maxLoss / (StopLoss * contractSize * points * usdCad.ask));
+   double Volume = (StopLoss == 0 || UseDefaultVolume) ? DefaultVolume : (maxLoss / (StopLoss * contractSize * points * usdCad.ask));
    Volume = Clamp(minVolume, maxVolume, Volume);
    Volume = MathFloor(Volume / stepVolume) / stepVolume;
    
@@ -105,7 +106,7 @@ void OnTimer()
       request.type_filling = ORDER_FILLING_IOC;
       request.magic = EXPERT_MAGIC;
       
-      //Send Reqeust And Check For Error
+      //Send Request And Check For Error
       if(!OrderSend(request, result))
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
          
@@ -143,7 +144,7 @@ void OnTimer()
       request.type_filling = ORDER_FILLING_IOC;
       request.magic = EXPERT_MAGIC;
       
-      //Send Reqeust And Check For Error
+      //Send Request And Check For Error
       if(!OrderSend(request, result))
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
       
@@ -245,7 +246,7 @@ void CreatePanel()
    _closeAllButton.Description("Close All");
    _closeAllButton.FontSize(10);
    _closeAllButton.Color(clrBlack);
-   _closeAllButton.BackColor(clrBlue);
+   _closeAllButton.BackColor(clrBlueViolet);
    _closeAllButton.BorderColor(clrBlack);
 }
 
