@@ -4,6 +4,7 @@
 #define TOSTRING(A)  #A + " = " + (string)(A) + "\n"
 #define TOSTRING2(A) #A + " = " + EnumToString(A) + " (" + (string)(A) + ")\n"
 #define EXPERT_MAGIC 9797
+#define TRAILING_STOP_LINE "TrailingStopLine"
 
 input double LossPercentage;
 
@@ -81,7 +82,12 @@ void OnTimer()
    
    double Volume = (StopLoss == 0 || UseDefaultVolume) ? DefaultVolume : (maxLoss / (StopLoss * contractSize * points * usdCad.ask));
    Volume = Clamp(minVolume, maxVolume, Volume);
-   Volume = MathFloor(Volume / stepVolume) / stepVolume;
+   Volume = MathFloor(Volume / stepVolume) * stepVolume;
+   
+   if(isTrailingPosition && !PositionSelectByTicket(trailingTicket))
+   {
+      isTrailingPosition = false;
+   }
    
    //Generating Sell Order
    if(_sellButton.State())
@@ -124,7 +130,10 @@ void OnTimer()
       else if(UseTrailingStop && !isTrailingPosition)
       {
          isTrailingPosition = true;
-         trailingTicket = result.deal;
+         isTrailingStopStarted = false;
+         trailingTicket = PositionGetTicket(0);
+         
+         trailingStartingPrice = bid;
       }
          
       if(IsDebug)
@@ -170,7 +179,10 @@ void OnTimer()
       else if(UseTrailingStop && !isTrailingPosition)
       {
          isTrailingPosition = true;
-         trailingTicket = result.deal;
+         isTrailingStopStarted = false;
+         trailingTicket = PositionGetTicket(0);
+         
+         trailingStartingPrice = ask;
       }
       
       if(IsDebug)
@@ -195,7 +207,10 @@ void OnTimer()
       }
       
       if(isTrailingSell)
+      {
          isTrailingPosition = false;
+         DeleteTrailingLine();
+      }
    }
    else if(_closeBuyButton.State())
    {
@@ -216,7 +231,10 @@ void OnTimer()
       }
       
       if(!isTrailingSell)
+      {
          isTrailingPosition = false;
+         DeleteTrailingLine();
+      }
    }
    else if(_closeAllButton.State())
    { 
@@ -237,6 +255,7 @@ void OnTimer()
       }
       
       isTrailingPosition = false;
+      DeleteTrailingLine();
    }
    
    //The Custom Trailing Stop
@@ -244,33 +263,45 @@ void OnTimer()
    {
       if(isTrailingStopStarted)
       {
-         int currentDeltaPoints = isTrailingSell ? ((bid - trailingStartingPrice) / points) * -1 : (ask - trailingStartingPrice) / points;
+         Print("Trailing!!!");
+      
+         int currentDeltaPoints = isTrailingSell ? ((ask - trailingStartingPrice) / points) * -1 : (bid - trailingStartingPrice) / points;
          trailingStopMaxPoint = MathMax(trailingStopMaxPoint, currentDeltaPoints);
+         
+         UpdateTrailingLine(trailingStartingPrice + trailingStopMaxPoint * points);
          
          if(trailingStopMaxPoint - currentDeltaPoints >= TakeProfit)
          {
             //Close The Position
             trade.PositionClose(trailingTicket);
             isTrailingPosition = false;
+            
+            DeleteTrailingLine();
          }
       }
       else
       {
+         Print("Waiting For Trailing");
+         
          //Check If The Price Have Cross The TakeProfit Line To Start Trailing Stop
          if(isTrailingSell)
          {
-            if(bid <= trailingStartingPrice - (points * TakeProfit))
+            if(ask <= trailingStartingPrice - (points * TakeProfit))
             {
                isTrailingStopStarted = true;   
-               trailingStopMaxPoint =  ((bid - trailingStartingPrice) / points) * -1;
+               trailingStopMaxPoint =  ((ask - trailingStartingPrice) / points) * -1;
+               
+               CreateTrailingLine(ask + (points * trailingStopMaxPoint));
             }
          }
          else
          {
-            if(ask >= trailingStartingPrice + (points * TakeProfit))
+            if(bid >= trailingStartingPrice + (points * TakeProfit))
             {
                isTrailingStopStarted = true;
-               trailingStopMaxPoint = (ask - trailingStartingPrice) / points;
+               trailingStopMaxPoint = (bid - trailingStartingPrice) / points;
+               
+               CreateTrailingLine(bid - (points * trailingStopMaxPoint));
             }
          }
       }
@@ -329,6 +360,35 @@ void DeletePanel()
    _closeSellButton.Delete();
    _closeBuyButton.Delete();
    _closeAllButton.Delete();
+   
+   DeleteTrailingLine();
+}
+
+void CreateTrailingLine(double Value)
+{
+   //Create The Trailing Stop Line
+   if(ObjectCreate(0 , TRAILING_STOP_LINE, OBJ_HLINE, 0, 0, Value))
+   {
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_COLOR, clrMagenta);
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_STYLE, STYLE_DOT);
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_BACK, false);
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_SELECTED, false);
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, TRAILING_STOP_LINE, OBJPROP_ZORDER, 0);
+   }
+}
+void UpdateTrailingLine(double Value)
+{
+   //Update The Trailing Stop Line Based On New Price
+   ObjectMove(0, TRAILING_STOP_LINE, 0, 0, Value);
+}
+
+void DeleteTrailingLine()
+{
+   //Delete The Trailing Stop Line
+   ObjectDelete(0, TRAILING_STOP_LINE);
 }
 
 double Clamp(double Min, double Max, double Value)
