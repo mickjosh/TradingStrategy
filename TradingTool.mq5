@@ -46,7 +46,6 @@ int trailingStopMaxPoint;
 int OnInit()
 {
    CreatePanel();
-   EventSetTimer(1);
    
    currentSymbol = Symbol();
    
@@ -67,7 +66,7 @@ void OnDeinit(const int reason)
    DeletePanel();
 }
 
-void OnTimer()
+void OnTick()
 {
    //Getting USDCAD Info
    MqlTick usdCad;
@@ -129,6 +128,7 @@ void OnTimer()
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
       else if(UseTrailingStop && !isTrailingPosition)
       {
+         isTrailingSell = true;
          isTrailingPosition = true;
          isTrailingStopStarted = false;
          trailingTicket = PositionGetTicket(0);
@@ -178,6 +178,7 @@ void OnTimer()
          PrintFormat("OrderSend error %d (%s)",GetLastError(), result.comment);
       else if(UseTrailingStop && !isTrailingPosition)
       {
+         isTrailingSell = false;
          isTrailingPosition = true;
          isTrailingStopStarted = false;
          trailingTicket = PositionGetTicket(0);
@@ -265,7 +266,7 @@ void OnTimer()
       {
          Print("Trailing!!!");
       
-         int currentDeltaPoints = isTrailingSell ? ((ask - trailingStartingPrice) / points) * -1 : (bid - trailingStartingPrice) / points;
+         int currentDeltaPoints = isTrailingSell ? ((ask - trailingStartingPrice) / points) : (bid - trailingStartingPrice) / points;
          trailingStopMaxPoint = MathMax(trailingStopMaxPoint, currentDeltaPoints);
          
          UpdateTrailingLine(trailingStartingPrice + trailingStopMaxPoint * points);
@@ -288,10 +289,10 @@ void OnTimer()
          {
             if(ask <= trailingStartingPrice - (points * TakeProfit))
             {
-               isTrailingStopStarted = true;   
-               trailingStopMaxPoint =  ((ask - trailingStartingPrice) / points) * -1;
+               isTrailingStopStarted = true;
+               trailingStopMaxPoint = ((ask - trailingStartingPrice) / points);
                
-               CreateTrailingLine(ask + (points * trailingStopMaxPoint));
+               CreateTrailingLine(trailingStartingPrice + (points * trailingStopMaxPoint));
             }
          }
          else
@@ -301,7 +302,7 @@ void OnTimer()
                isTrailingStopStarted = true;
                trailingStopMaxPoint = (bid - trailingStartingPrice) / points;
                
-               CreateTrailingLine(bid - (points * trailingStopMaxPoint));
+               CreateTrailingLine(trailingStartingPrice - (points * trailingStopMaxPoint));
             }
          }
       }
