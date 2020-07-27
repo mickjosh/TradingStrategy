@@ -266,7 +266,7 @@ void OnTick()
       {
          Print("Trailing!!!");
       
-         int currentDeltaPoints = isTrailingSell ? ((ask - trailingStartingPrice) / points) : (bid - trailingStartingPrice) / points;
+         int currentDeltaPoints = isTrailingSell ? ((ask - trailingStartingPrice) / points) * -1 : (bid - trailingStartingPrice) / points;
          trailingStopMaxPoint = MathMax(trailingStopMaxPoint, currentDeltaPoints);
          
          UpdateTrailingLine(trailingStartingPrice + trailingStopMaxPoint * points);
@@ -290,7 +290,7 @@ void OnTick()
             if(ask <= trailingStartingPrice - (points * TakeProfit))
             {
                isTrailingStopStarted = true;
-               trailingStopMaxPoint = ((ask - trailingStartingPrice) / points);
+               trailingStopMaxPoint = ((ask - trailingStartingPrice) / points) * -1;
                
                CreateTrailingLine(trailingStartingPrice + (points * trailingStopMaxPoint));
             }
